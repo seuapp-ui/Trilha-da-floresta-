@@ -1,0 +1,11 @@
+{
+  "name": "Trilha da Floresta",
+  "short_name": "Trilha da Floresta",
+  "description": "Jogo de plataforma lateral 2.5D inspirado em clássicos do gênero.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f1a12",
+  "theme_color": "#3f8f4f",
+  "orientation": "landscape-primary",
+  "icons": []
+}

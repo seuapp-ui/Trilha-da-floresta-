@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Trilha da Floresta — Plataforma 2.5D</title>
+  <meta name="description" content="Jogo de plataforma lateral 2.5D inspirado em clássicos do gênero, com física suave, parallax em múltiplas camadas e mecânicas modernas." />
+  <meta name="theme-color" content="#3f8f4f" />
+
+  <!-- PWA-ready hooks (add manifest.json + service worker to complete the conversion) -->
+  <link rel="manifest" href="manifest.json" />
+
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.70.0/phaser.min.js"></script>
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <!-- Modular ES6 game code. index.js only imports main.js; every other
+       module is pulled in transitively via ES module imports, so adding
+       new files never requires touching this HTML. -->
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
