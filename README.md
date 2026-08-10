@@ -34,6 +34,16 @@ Depois abra `http://localhost:8080` no navegador.
 Controles de toque aparecem automaticamente em dispositivos com tela sensível
 ao toque (detectado via `this.sys.game.device.input.touch`).
 
+### Controles mobile (melhorados)
+
+- Botão de **pulo maior** e de **ataque maior** que o D-pad
+- **Hit area** maior que o visual (tolerância ao arrastar o dedo)
+- **Multitouch** (até 4 ponteiros) — andar + pular + atacar ao mesmo tempo
+- Ação **não é cancelada** ao sair levemente do botão (`pointerout` ignorado; só `pointerup`)
+- **Vibração** curta opcional no toque (se o aparelho permitir)
+- Tamanhos **adaptativos** em telas pequenas
+
+
 ## Arquitetura
 
 ```
@@ -88,6 +98,15 @@ src/
 - **Áudio real**: carregue arquivos com `this.load.audio(key, url)` no
   PreloadScene; `AudioManager` já prefere um som carregado no lugar do bip
   procedural de fallback automaticamente.
+
+## Fases (Mundo 1)
+
+| ID | Nome | Desbloqueio |
+|----|------|-------------|
+| `w1_l1` | Trilha da Clareira Verde | Inicial |
+| `w1_l2` | Rio Encantado | Completar a fase 1 |
+
+O menu lista as fases com estrelas e cadeado. Completar uma fase desbloqueia a próxima (`nextLevelId` em `LevelData.js`).
 
 ## Sistema de estrelas
 

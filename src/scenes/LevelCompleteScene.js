@@ -1,5 +1,6 @@
 import { UI } from '../modules/UI.js';
 import { Save, computeStars } from '../modules/Save.js';
+import { getNextLevelId, LEVELS } from '../config/LevelData.js';
 
 /**
  * LevelCompleteScene.js
@@ -87,10 +88,23 @@ export class LevelCompleteScene extends Phaser.Scene {
       fontFamily: 'Arial, sans-serif', fontSize: '18px', color: damageColor,
     }).setOrigin(0.5);
 
-    UI.button(this, width / 2, height * 0.74, 'Jogar Novamente', () => {
+    const nextId = getNextLevelId(this.levelId);
+    const nextUnlocked = nextId && Save.load().unlockedLevels.includes(nextId);
+    const yReplay = nextUnlocked ? 0.68 : 0.74;
+    const yMenu = nextUnlocked ? 0.90 : 0.86;
+
+    UI.button(this, width / 2, height * yReplay, 'Jogar Novamente', () => {
       this.scene.start('Game', { levelId: this.levelId });
     });
-    UI.button(this, width / 2, height * 0.86, 'Menu Principal', () => {
+
+    if (nextUnlocked) {
+      const nextName = LEVELS[nextId]?.name || 'Próxima fase';
+      UI.button(this, width / 2, height * 0.79, `Próxima: ${nextName}`, () => {
+        this.scene.start('Game', { levelId: nextId });
+      }, { width: 280 });
+    }
+
+    UI.button(this, width / 2, height * yMenu, 'Menu Principal', () => {
       this.scene.start('Menu');
     }, { color: 0x8a5a2b, hoverColor: 0xa06e34 });
   }

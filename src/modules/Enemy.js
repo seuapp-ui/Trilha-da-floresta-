@@ -123,8 +123,10 @@ export class Bat extends Enemy {
 
   updateAI(time, delta) {
     this.sprite.y = this.baseY + Math.sin(time * E.BAT_FREQUENCY + this.phase) * this.amplitude;
-    this.sprite.x += this.dir * E.BAT_SPEED * (1 / 60);
-    if (Math.random() < 0.003) this.dir *= -1;
+    // delta-based so speed is frame-rate independent (was locked to 1/60)
+    this.sprite.x += this.dir * E.BAT_SPEED * (delta / 1000);
+    // ~0.18% chance per frame at 60fps → scale by delta so flip rate stays similar
+    if (Math.random() < 0.18 * (delta / 1000)) this.dir *= -1;
     this.sprite.setFlipX(this.dir < 0);
     this.animCtrl.setState('fast');
     this.animCtrl.update(delta);

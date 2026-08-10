@@ -26,6 +26,10 @@ const config = {
     min: { width: 400, height: 225 },
     max: { width: 1920, height: 1080 },
   },
+  // Multitouch: left/right + jump + attack simultaneously on mobile
+  input: {
+    activePointers: 4,
+  },
   scene: getSceneList(),
 };
 
