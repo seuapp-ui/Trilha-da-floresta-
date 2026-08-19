@@ -22,7 +22,8 @@ export class Player {
     this.audio = audio;
 
     this.sprite = scene.physics.add.sprite(x, y, 'idle_0');
-    this.sprite.setSize(C.BODY_WIDTH, C.BODY_HEIGHT).setOffset((30 - C.BODY_WIDTH) / 2, 44 - C.BODY_HEIGHT);
+    // Texture is 32×48; body is centered horizontally and anchored to the feet
+    this.sprite.setSize(C.BODY_WIDTH, C.BODY_HEIGHT).setOffset((32 - C.BODY_WIDTH) / 2, 48 - C.BODY_HEIGHT);
     this.sprite.setMaxVelocity(C.RUN_SPEED + 60, GameConfig.PHYSICS.MAX_FALL_SPEED);
     this.sprite.setDragX(0);
     this.sprite.setDepth(GameConfig.DEPTH.PLAYER);

@@ -1,5 +1,6 @@
 import { GameConfig } from '../config/GameConfig.js';
 import { AnimationController } from './Animation.js';
+import { WasmMath } from '../wasm/WasmBridge.js';
 
 const E = GameConfig.ENEMY;
 
@@ -8,9 +9,8 @@ const E = GameConfig.ENEMY;
  * -----------------------------------------------------------------------
  * Base Enemy class handles shared bookkeeping (sprite, health, defeat
  * FX). Each concrete enemy overrides `updateAI(time, delta, player)` for
- * its own movement pattern. Adding a new enemy type later means adding
- * one more small subclass here and one entry in EnemyFactory - nothing
- * else in the codebase needs to change.
+ * its own movement pattern. Bat vertical/horizontal motion is driven by
+ * the WebAssembly math module when available (batch-updated by EnemyManager).
  * -----------------------------------------------------------------------
  */
 export class Enemy {
@@ -110,6 +110,10 @@ export class Boar extends Enemy {
   }
 }
 
+/**
+ * Bat — motion core runs in WebAssembly (sine + horizontal drift).
+ * EnemyManager calls applyWasmPose() after the batch updateBats().
+ */
 export class Bat extends Enemy {
   constructor(scene, cfg, deps) {
     super(scene, cfg.x, cfg.y, ['bat_0', 'bat_1'], deps);
@@ -119,16 +123,74 @@ export class Bat extends Enemy {
     this.sprite.body.setAllowGravity(false);
     this.sprite.body.setSize(30, 16).setOffset(6, 8);
     this.dir = 1;
+    /** Index into the WASM bat buffer; assigned by EnemyManager. */
+    this.wasmIndex = -1;
   }
 
   updateAI(time, delta) {
+    if (this.wasmIndex >= 0 && WasmMath.ready) {
+      this.sprite.setFlipX(this.dir < 0);
+      this.animCtrl.setState('fast');
+      this.animCtrl.update(delta);
+      return;
+    }
     this.sprite.y = this.baseY + Math.sin(time * E.BAT_FREQUENCY + this.phase) * this.amplitude;
-    // delta-based so speed is frame-rate independent (was locked to 1/60)
     this.sprite.x += this.dir * E.BAT_SPEED * (delta / 1000);
-    // ~0.18% chance per frame at 60fps → scale by delta so flip rate stays similar
-    if (Math.random() < 0.18 * (delta / 1000)) this.dir *= -1;
+    if (Math.random() < 0.003) this.dir *= -1;
     this.sprite.setFlipX(this.dir < 0);
     this.animCtrl.setState('fast');
+    this.animCtrl.update(delta);
+  }
+
+  syncToWasm() {
+    if (this.wasmIndex < 0 || !WasmMath.ready) return;
+    WasmMath.setBat(this.wasmIndex, this.baseY, this.phase, this.amplitude, this.sprite.x, this.dir);
+  }
+
+  applyWasmPose() {
+    if (this.wasmIndex < 0 || !WasmMath.ready) return;
+    this.sprite.x = WasmMath.getBatX(this.wasmIndex);
+    this.sprite.y = WasmMath.getBatY(this.wasmIndex);
+    if (Math.random() < 0.003) {
+      this.dir *= -1;
+      WasmMath.setBatDir(this.wasmIndex, this.dir);
+    }
+  }
+}
+
+
+/**
+ * Frog — hops along a patrol range. Jumps periodically with cooldown.
+ */
+export class Frog extends Enemy {
+  constructor(scene, cfg, deps) {
+    super(scene, cfg.x, cfg.y, ['frog_0', 'frog_1'], deps);
+    this.patrolMin = cfg.patrolMin ?? cfg.x - 80;
+    this.patrolMax = cfg.patrolMax ?? cfg.x + 80;
+    this.dir = 1;
+    this.nextJumpAt = 0;
+    this.sprite.body.setSize(28, 18).setOffset(8, 12);
+  }
+
+  updateAI(time, delta) {
+    const onGround = this.sprite.body.blocked.down || this.sprite.body.touching.down;
+    if (this.sprite.x <= this.patrolMin) this.dir = 1;
+    if (this.sprite.x >= this.patrolMax) this.dir = -1;
+
+    if (onGround) {
+      this.sprite.setVelocityX(0);
+      if (time >= this.nextJumpAt) {
+        this.sprite.setVelocity(this.dir * E.FROG_SPEED * 2.2, E.FROG_JUMP_VELOCITY);
+        this.nextJumpAt = time + E.FROG_JUMP_COOLDOWN_MS;
+        this.animCtrl.setState('fast');
+      } else {
+        this.animCtrl.setState('slow');
+      }
+    } else {
+      this.sprite.setVelocityX(this.dir * E.FROG_SPEED * 1.6);
+      this.animCtrl.setState('fast');
+    }
+    this.sprite.setFlipX(this.dir < 0);
     this.animCtrl.update(delta);
   }
 }
@@ -137,4 +199,5 @@ export const EnemyFactory = {
   slug: Slug,
   boar: Boar,
   bat: Bat,
+  frog: Frog,
 };

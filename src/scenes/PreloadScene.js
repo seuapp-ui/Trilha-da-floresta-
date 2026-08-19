@@ -1,13 +1,12 @@
 import { TextureGenerator } from '../utils/TextureGenerator.js';
+import { WasmMath } from '../wasm/WasmBridge.js';
 
 /**
  * PreloadScene.js
  * -----------------------------------------------------------------------
  * Generates every texture used by the game (see TextureGenerator) and
- * registers shared Phaser animations. This is also where real asset
- * loading (this.load.image / this.load.audio) would go if/when the
- * procedural art is swapped for hand-made sprites - nothing downstream
- * needs to change since consumers only ever refer to texture *keys*.
+ * registers shared Phaser animations. Also boots the WebAssembly math
+ * module (with automatic JS fallback) before handing off to Menu.
  * -----------------------------------------------------------------------
  */
 export class PreloadScene extends Phaser.Scene {
@@ -23,20 +22,25 @@ export class PreloadScene extends Phaser.Scene {
       fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#ffffff',
     }).setOrigin(0.5);
 
-    // Fake incremental progress while textures generate (generation itself
-    // is synchronous and fast, but this gives visual feedback + a hook for
-    // future real asset loading).
+    this._progressBar = bar;
     this.tweens.add({
       targets: bar,
       width: 312,
-      duration: 400,
-      onUpdate: () => { barBg; },
+      duration: 500,
     });
   }
 
-  create() {
+  async create() {
     new TextureGenerator(this).generateAll();
     this._registerAnimations();
+
+    try {
+      await WasmMath.init();
+      if (this._progressBar) this._progressBar.width = 312;
+    } catch (e) {
+      console.warn('[Preload] WasmMath init failed:', e);
+    }
+
     this.scene.start('Menu');
   }
 

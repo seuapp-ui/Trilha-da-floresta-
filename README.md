@@ -34,16 +34,6 @@ Depois abra `http://localhost:8080` no navegador.
 Controles de toque aparecem automaticamente em dispositivos com tela sensível
 ao toque (detectado via `this.sys.game.device.input.touch`).
 
-### Controles mobile (melhorados)
-
-- Botão de **pulo maior** e de **ataque maior** que o D-pad
-- **Hit area** maior que o visual (tolerância ao arrastar o dedo)
-- **Multitouch** (até 4 ponteiros) — andar + pular + atacar ao mesmo tempo
-- Ação **não é cancelada** ao sair levemente do botão (`pointerout` ignorado; só `pointerup`)
-- **Vibração** curta opcional no toque (se o aparelho permitir)
-- Tamanhos **adaptativos** em telas pequenas
-
-
 ## Arquitetura
 
 ```
@@ -99,15 +89,6 @@ src/
   PreloadScene; `AudioManager` já prefere um som carregado no lugar do bip
   procedural de fallback automaticamente.
 
-## Fases (Mundo 1)
-
-| ID | Nome | Desbloqueio |
-|----|------|-------------|
-| `w1_l1` | Trilha da Clareira Verde | Inicial |
-| `w1_l2` | Rio Encantado | Completar a fase 1 |
-
-O menu lista as fases com estrelas e cadeado. Completar uma fase desbloqueia a próxima (`nextLevelId` em `LevelData.js`).
-
 ## Sistema de estrelas
 
 Cada fase concede **1 a 3 estrelas** de forma **aditiva**:
@@ -137,3 +118,55 @@ armadilhas (espinhos, tronco caindo, pedra rolante), checkpoint que
 salva posição/moedas/cristais e respawna o jogador ao morrer, portal de
 fim de fase com tela de "Fase Completa" e **sistema de 1–3 estrelas**, HUD reativo, e salvamento
 automático de progresso via `localStorage`.
+
+## WebAssembly
+
+Hot-paths de matemática rodam em **WebAssembly** (compilado de AssemblyScript):
+
+| Função WASM | Uso no jogo |
+|-------------|-------------|
+| `updateBats` | Movimento senoidal + horizontal de todos os morcegos em um único call |
+| `driftClouds` | Deriva das nuvens do parallax |
+| `classifyContacts` | Pré-filtro de stomp/dano (API pronta para expansão) |
+| `computeStars` / `rng*` / `fillDecorX` | Utilitários determinísticos |
+
+Arquivos:
+- `wasm/game_math.ts` — fonte AssemblyScript
+- `src/wasm/game_math.wasm` — binário (~5 KB)
+- `src/wasm/WasmBridge.js` — loader + **fallback JS idêntico** se WASM falhar
+
+Recompilar após editar a fonte:
+
+```bash
+npm install
+npm run build:wasm
+```
+
+O `PreloadScene` inicializa o módulo antes do Menu. No console do navegador deve aparecer:
+`[WasmMath] WebAssembly module loaded`
+
+## Renderização (WebGL + WebGPU)
+
+Stack de render:
+
+| Camada | Tecnologia | Função |
+|--------|------------|--------|
+| Sprites, tiles, partículas, HUD | **Phaser WEBGL** (fallback Canvas) | Gameplay |
+| Céu procedural | **WebGPU** (WGSL) | Gradiente, sol, nuvens com noise |
+
+Fluxo:
+1. `pickPhaserRenderType()` escolhe WEBGL se disponível
+2. Se `navigator.gpu` existe, o canvas fica transparente e `WebGPUSky` desenha atrás
+3. Sem WebGPU, o tile `sky` gerado em `TextureGenerator` continua sendo usado
+
+Arquivos:
+- `src/render/WebGPUDevice.js` — adapter / device
+- `src/render/WebGPUSky.js` — shader WGSL full-screen
+- `src/render/RendererBootstrap.js` — orquestração
+
+No console:
+```
+[Renderer] Phaser backend: WEBGL
+[WebGPU] Device ready · format …
+[Renderer] WebGPU procedural sky active
+```

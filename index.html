@@ -6,19 +6,65 @@
   <title>Trilha da Floresta — Plataforma 2.5D</title>
   <meta name="description" content="Jogo de plataforma lateral 2.5D inspirado em clássicos do gênero, com física suave, parallax em múltiplas camadas e mecânicas modernas." />
   <meta name="theme-color" content="#3f8f4f" />
-
-  <!-- PWA-ready hooks (add manifest.json + service worker to complete the conversion) -->
   <link rel="manifest" href="manifest.json" />
-
   <link rel="stylesheet" href="style.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.70.0/phaser.min.js"></script>
 </head>
 <body>
   <div id="game-container"></div>
+  <div id="boot-error" hidden></div>
 
-  <!-- Modular ES6 game code. index.js only imports main.js; every other
-       module is pulled in transitively via ES module imports, so adding
-       new files never requires touching this HTML. -->
-  <script type="module" src="src/main.js"></script>
+  <!--
+    Phaser is loaded before the ES module. Two CDNs are tried in sequence;
+    this avoids a blank screen when one CDN is temporarily unavailable.
+  -->
+  <script>
+    (function () {
+      const errorBox = document.getElementById('boot-error');
+      const showError = (message) => {
+        errorBox.hidden = false;
+        errorBox.innerHTML = '<strong>Não foi possível iniciar o jogo.</strong><br><br>' +
+          String(message || 'Erro desconhecido') +
+          '<br><br><small>Atualize a página com Ctrl+F5. Se continuar, abra o console do navegador (F12) para ver o erro.</small>';
+      };
+
+      window.addEventListener('error', (event) => {
+        if (event.error || event.message) showError(event.error?.message || event.message);
+      });
+      window.addEventListener('unhandledrejection', (event) => {
+        showError(event.reason?.message || event.reason || 'Erro ao carregar um módulo do jogo.');
+      });
+
+      const sources = [
+        'https://cdnjs.cloudflare.com/ajax/libs/phaser/3.70.0/phaser.min.js',
+        'https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js',
+        'https://unpkg.com/phaser@3.70.0/dist/phaser.min.js'
+      ];
+
+      let index = 0;
+      const loadPhaser = () => {
+        if (window.Phaser) {
+          startGame();
+          return;
+        }
+        if (index >= sources.length) {
+          showError('A biblioteca Phaser não pôde ser carregada. Verifique a conexão com a internet.');
+          return;
+        }
+        const script = document.createElement('script');
+        script.src = sources[index++];
+        script.onload = () => startGame();
+        script.onerror = loadPhaser;
+        document.head.appendChild(script);
+      };
+
+      function startGame() {
+        import('./src/main.js?v=20260819expand').catch((error) => {
+          showError(error?.stack || error?.message || error);
+        });
+      }
+
+      loadPhaser();
+    })();
+  </script>
 </body>
 </html>

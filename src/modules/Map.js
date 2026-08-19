@@ -87,9 +87,9 @@ export class Map {
       const texture = p.type === 'wood' ? 'tile_wood' : 'tile_stone';
       const tileW = 64;
       const count = Math.max(1, Math.round(p.width / tileW));
+      const startX = p.x - (count * tileW) / 2 + tileW / 2;
       for (let i = 0; i < count; i++) {
-        const tx = p.x + i * tileW + tileW / 2 - p.width / 2 + tileW / 2;
-        const tile = this.platformGroup.create(p.x - p.width / 2 + i * tileW + tileW / 2, p.y, texture);
+        const tile = this.platformGroup.create(startX + i * tileW, p.y, texture);
         tile.setDepth(D);
         tile.refreshBody();
       }
@@ -124,19 +124,29 @@ export class Map {
     const decor = this.data.decor;
     if (!decor) return;
 
-    const place = (list, originY = 1, scaleRange = [0.8, 1.2]) => {
+    const place = (list, originY = 1, scaleRange = [0.8, 1.2], depth = D) => {
       (list || []).forEach((item) => {
-        const img = this.scene.add.image(item.x, this.data.groundY, item.variant)
+        this.scene.add.image(item.x, this.data.groundY, item.variant)
           .setOrigin(0.5, originY)
-          .setDepth(D)
+          .setDepth(depth)
           .setScale(Phaser.Math.FloatBetween(scaleRange[0], scaleRange[1]));
-        img.y = this.data.groundY;
       });
     };
 
-    place(decor.bushes);
-    place(decor.flowers, 1, [0.9, 1.3]);
-    place(decor.rocksDecor, 1, [0.8, 1.1]);
+    // Near trees sit behind platforms but in front of far scenery
+    place(decor.treesNear, 1, [0.85, 1.15], GameConfig.DEPTH.TREES_NEAR);
+    place(decor.bushes, 1, [0.85, 1.2]);
+    place(decor.flowers, 1, [0.9, 1.35]);
+    place(decor.rocksDecor, 1, [0.8, 1.15]);
+
+    // Grass tufts along the ground for extra detail (deterministic spacing)
+    for (let i = 0, x = 40; x < this.data.levelWidth; i++) {
+      this.scene.add.image(x, this.data.groundY + 2, 'grass_tuft')
+        .setOrigin(0.5, 1)
+        .setDepth(D + 1)
+        .setScale(0.75 + (i % 5) * 0.08);
+      x += 75 + (i % 4) * 18;
+    }
   }
 
   /** Returns true if the given world x,y falls inside a slope zone, and its direction. */

@@ -1,5 +1,5 @@
 import { GameConfig } from '../config/GameConfig.js';
-import { LEVELS, getNextLevelId } from '../config/LevelData.js';
+import { LEVELS } from '../config/LevelData.js';
 import { Map } from '../modules/Map.js';
 import { Parallax } from '../modules/Parallax.js';
 import { Player } from '../modules/Player.js';
@@ -321,10 +321,7 @@ export class GameScene extends Phaser.Scene {
     this.cameraManager.flash(400, 255, 255, 255);
 
     const timeMs = this.time.now - this.runState.startTime;
-    // Keep current unlocked + unlock the next stage in the chain
     Save.unlockLevel(this.levelId);
-    const nextId = getNextLevelId(this.levelId);
-    if (nextId) Save.unlockLevel(nextId);
     // Persistence of coins / crystals / stars is done in LevelCompleteScene
     // so we have a single authoritative write with the computed star rating.
 

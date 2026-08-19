@@ -64,6 +64,9 @@ export const GameConfig = {
     BAT_SPEED: 90,
     BAT_AMPLITUDE: 40,
     BAT_FREQUENCY: 0.004,
+    FROG_SPEED: 55,
+    FROG_JUMP_VELOCITY: -420,
+    FROG_JUMP_COOLDOWN_MS: 900,
     STOMP_BOUNCE: -420,
   },
 

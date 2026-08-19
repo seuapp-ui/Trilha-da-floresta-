@@ -1,0 +1,14 @@
+{
+  "name": "trilha-da-floresta",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Plataforma 2.5D com Phaser 3 + WebAssembly (AssemblyScript) para hot-paths de matemática",
+  "type": "module",
+  "scripts": {
+    "build:wasm": "node node_modules/assemblyscript/bin/asc wasm/game_math.ts -o src/wasm/game_math.wasm -t src/wasm/game_math.wat --optimize --runtime minimal --bindings esm",
+    "serve": "python3 -m http.server 8080"
+  },
+  "devDependencies": {
+    "assemblyscript": "^0.28.20"
+  }
+}

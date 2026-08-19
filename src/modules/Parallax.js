@@ -1,16 +1,11 @@
 import { GameConfig } from '../config/GameConfig.js';
+import { WasmMath } from '../wasm/WasmBridge.js';
 
 /**
  * Parallax.js
  * -----------------------------------------------------------------------
- * Builds the seven parallax layers (sky, clouds, mountains, distant
- * trees, near trees, main terrain*, foreground) and assigns each a
- * scrollFactor so they move at different speeds relative to the camera,
- * producing the depth effect described in the design doc.
- *
- * * The "main terrain" layer itself is the real, collidable level built
- *   by Map.js - this class only owns the six purely decorative layers
- *   plus the foreground overlay.
+ * Builds the seven parallax layers and assigns each a scrollFactor.
+ * Cloud drift is driven by the WebAssembly math module when available.
  * -----------------------------------------------------------------------
  */
 export class Parallax {
@@ -19,6 +14,7 @@ export class Parallax {
     this.levelWidth = levelWidth;
     this.levelHeight = levelHeight;
     this.layers = {};
+    this._cloudSprites = [];
     this._build();
   }
 
@@ -27,14 +23,19 @@ export class Parallax {
     const P = GameConfig.PARALLAX;
     const D = GameConfig.DEPTH;
 
-    // --- Layer 1: Sky (fixed) --------------------------------------
-    const sky = scene.add.tileSprite(0, 0, levelWidth * 1.5, levelHeight, 'sky')
-      .setOrigin(0, 0)
-      .setScrollFactor(P.SKY)
-      .setDepth(D.SKY);
-    this.layers.sky = sky;
+    // When WebGPU procedural sky is active, skip the static texture
+    // so the underlay canvas shows through the transparent Phaser clear.
+    const useWebGPUSky = scene.game.registry.get('webgpuSky') === true;
+    if (!useWebGPUSky) {
+      const sky = scene.add.tileSprite(0, 0, levelWidth * 1.5, levelHeight, 'sky')
+        .setOrigin(0, 0)
+        .setScrollFactor(P.SKY)
+        .setDepth(D.SKY);
+      this.layers.sky = sky;
+    } else {
+      this.layers.sky = null;
+    }
 
-    // --- Layer 2: Clouds (10%) --------------------------------------
     const clouds = scene.add.group();
     for (let i = 0; i < 14; i++) {
       const c = scene.add.image(
@@ -44,17 +45,20 @@ export class Parallax {
       ).setScrollFactor(P.CLOUDS).setDepth(D.CLOUDS).setAlpha(0.9);
       c.setScale(Phaser.Math.FloatBetween(0.7, 1.4));
       clouds.add(c);
+      this._cloudSprites.push(c);
+      if (WasmMath.ready) {
+        WasmMath.setCloud(i, c.x, c.scaleX || 1);
+      }
     }
     this.layers.clouds = clouds;
 
-    // --- Layer 3: Mountains (20%) ------------------------------------
-    const mountains = scene.add.tileSprite(0, levelHeight - 320, levelWidth * 1.3, 320, 'mountain')
+    const mountains = scene.add.tileSprite(0, levelHeight - 280, levelWidth * 1.3, 280, 'mountain')
       .setOrigin(0, 0)
       .setScrollFactor(P.MOUNTAINS)
-      .setDepth(D.MOUNTAINS);
+      .setDepth(D.MOUNTAINS)
+      .setAlpha(0.95);
     this.layers.mountains = mountains;
 
-    // --- Layer 4: Distant trees (40%) --------------------------------
     const treesFar = scene.add.group();
     for (let x = 0; x < levelWidth * 1.1; x += 90) {
       const img = scene.add.image(x + Phaser.Math.Between(-20, 20), levelHeight - 40, Phaser.Math.RND.pick(['tree_far_1', 'tree_far_2']))
@@ -66,7 +70,6 @@ export class Parallax {
     }
     this.layers.treesFar = treesFar;
 
-    // --- Layer 5: Near trees (70%) ------------------------------------
     const treesNear = scene.add.group();
     for (let x = 0; x < levelWidth * 1.05; x += 220) {
       const img = scene.add.image(x + Phaser.Math.Between(-30, 30), levelHeight - 20, Phaser.Math.RND.pick(['tree_near_1', 'tree_near_2']))
@@ -77,7 +80,6 @@ export class Parallax {
     }
     this.layers.treesNear = treesNear;
 
-    // --- Layer 7: Foreground (120%) -----------------------------------
     const foreground = scene.add.group();
     for (let x = -100; x < levelWidth + 100; x += 260) {
       const img = scene.add.image(x, levelHeight + 6, 'foreground_leaves')
@@ -90,8 +92,27 @@ export class Parallax {
     this.layers.foreground = foreground;
   }
 
-  /** Call from scene update() to drift clouds slowly regardless of camera. */
   update(delta) {
-    if (this.layers.sky) this.layers.sky.tilePositionX += 0.01 * delta * 0.02;
+    if (this.layers.sky) this.layers.sky.tilePositionX += delta * 0.004;
+
+    const n = this._cloudSprites.length;
+    if (n === 0) return;
+
+    if (WasmMath.ready) {
+      // Sync → WASM → apply
+      for (let i = 0; i < n; i++) {
+        WasmMath.setCloud(i, this._cloudSprites[i].x, this._cloudSprites[i].scaleX || 1);
+      }
+      WasmMath.driftClouds(n, delta, 0.008, -80, this.levelWidth * 1.3);
+      for (let i = 0; i < n; i++) {
+        this._cloudSprites[i].x = WasmMath.getCloudX(i);
+      }
+    } else {
+      for (let i = 0; i < n; i++) {
+        const c = this._cloudSprites[i];
+        c.x += delta * 0.008 * (c.scaleX || 1);
+        if (c.x > this.levelWidth * 1.3) c.x = -80;
+      }
+    }
   }
 }

@@ -53,10 +53,19 @@ export class LevelCompleteScene extends Phaser.Scene {
       stars: this.starsEarned,
     });
 
-    this._drawStars(width / 2, height * 0.26, this.starsEarned);
+    // Unlock the next phase in the world
+    this.nextId = getNextLevelId(this.levelId);
+    if (this.nextId) Save.unlockLevel(this.nextId);
+
+    const levelName = LEVELS[this.levelId]?.name || this.levelId;
+    this.add.text(width / 2, height * 0.20, levelName, {
+      fontFamily: 'Arial, sans-serif', fontSize: '14px', color: '#b8e0c0',
+    }).setOrigin(0.5);
+
+    this._drawStars(width / 2, height * 0.28, this.starsEarned);
 
     const hint = this._starHint();
-    this.add.text(width / 2, height * 0.34, hint, {
+    this.add.text(width / 2, height * 0.36, hint, {
       fontFamily: 'Arial, sans-serif', fontSize: '13px', color: '#b8e0c0',
       align: 'center',
     }).setOrigin(0.5);
@@ -88,25 +97,20 @@ export class LevelCompleteScene extends Phaser.Scene {
       fontFamily: 'Arial, sans-serif', fontSize: '18px', color: damageColor,
     }).setOrigin(0.5);
 
-    const nextId = getNextLevelId(this.levelId);
-    const nextUnlocked = nextId && Save.load().unlockedLevels.includes(nextId);
-    const yReplay = nextUnlocked ? 0.68 : 0.74;
-    const yMenu = nextUnlocked ? 0.90 : 0.86;
-
-    UI.button(this, width / 2, height * yReplay, 'Jogar Novamente', () => {
-      this.scene.start('Game', { levelId: this.levelId });
-    });
-
-    if (nextUnlocked) {
-      const nextName = LEVELS[nextId]?.name || 'Próxima fase';
-      UI.button(this, width / 2, height * 0.79, `Próxima: ${nextName}`, () => {
-        this.scene.start('Game', { levelId: nextId });
-      }, { width: 280 });
+    let by = height * 0.70;
+    if (this.nextId) {
+      UI.button(this, width / 2, by, 'Próxima Fase →', () => {
+        this.scene.start('Game', { levelId: this.nextId });
+      }, { width: 260 });
+      by += 58;
     }
-
-    UI.button(this, width / 2, height * yMenu, 'Menu Principal', () => {
+    UI.button(this, width / 2, by, 'Jogar Novamente', () => {
+      this.scene.start('Game', { levelId: this.levelId });
+    }, { width: 260, color: 0x2e6b3b, hoverColor: 0x3f8f4f });
+    by += 58;
+    UI.button(this, width / 2, by, 'Menu Principal', () => {
       this.scene.start('Menu');
-    }, { color: 0x8a5a2b, hoverColor: 0xa06e34 });
+    }, { width: 260, color: 0x8a5a2b, hoverColor: 0xa06e34 });
   }
 
   _drawStars(cx, cy, earned) {

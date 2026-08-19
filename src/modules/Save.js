@@ -113,12 +113,9 @@ export class Save {
  * @returns {1|2|3}
  */
 export function computeStars({ coins, crystals, totalCoins, totalCrystals, noDamage }) {
-  let stars = 1; // finished
-
+  let stars = 1;
   const allCrystals = totalCrystals <= 0 || crystals >= totalCrystals;
   if (allCrystals) stars += 1;
-
   if (noDamage) stars += 1;
-
   return Math.min(3, stars);
 }
