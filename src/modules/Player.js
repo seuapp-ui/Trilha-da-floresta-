@@ -51,6 +51,7 @@ export class Player {
     this.landTimer = 0;
     this.hurtUntil = 0;
     this.locked = false; // input lock (death / level complete)
+    this.attackHitEnemies = new Set();
 
     this.onDeath = null;   // callback set by scene
     this.onDamage = null;  // callback set by scene (health changed for any reason)
@@ -78,6 +79,7 @@ export class Player {
     if (this.locked || this.isDead) return;
     if (time < this.attackReadyAt) return;
     this.isAttacking = true;
+    this.attackHitEnemies.clear();
     this.attackUntil = time + C.ATTACK_DURATION_MS;
     this.attackReadyAt = time + C.ATTACK_COOLDOWN_MS;
     this.animState = 'attack';
@@ -171,7 +173,10 @@ export class Player {
     }
 
     const attacking = this.isAttacking && time < this.attackUntil;
-    if (this.isAttacking && time >= this.attackUntil) this.isAttacking = false;
+    if (this.isAttacking && time >= this.attackUntil) {
+      this.isAttacking = false;
+      this.attackHitEnemies.clear();
+    }
 
     // ---- horizontal movement -----------------------------------
     const slope = map ? map.getSlopeAt(this.sprite.x) : null;

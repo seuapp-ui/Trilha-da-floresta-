@@ -38,7 +38,7 @@ export class Map {
       const count = Math.ceil(width / tileW);
       for (let i = 0; i < count; i++) {
         const tx = x + i * tileW + tileW / 2;
-        const tile = this.groundGroup.create(tx, groundY + 32, 'tile_ground');
+        const tile = this.groundGroup.create(tx, groundY, 'tile_ground');
         tile.setOrigin(0.5, 0);
         tile.setDepth(D);
         // static bodies must have size/offset set BEFORE refreshBody(),
@@ -57,7 +57,8 @@ export class Map {
       const water = this.scene.add.tileSprite(river.x, river.y, river.width, 80, 'tile_water')
         .setOrigin(0, 0)
         .setDepth(D - 1);
-      this.waterZone = this.scene.add.zone(river.x, river.y, river.width, 200).setOrigin(0, 0);
+      // Keep the damage volume aligned with the visible water surface.
+      this.waterZone = this.scene.add.zone(river.x, river.y, river.width, 80).setOrigin(0, 0);
       this.scene.physics.add.existing(this.waterZone, true);
       this._waterTile = water;
     }

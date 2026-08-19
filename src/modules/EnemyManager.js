@@ -60,7 +60,9 @@ export class EnemyManager {
     }
 
     for (let i = 0; i < this.enemies.length; i++) {
-      this.enemies[i].update(time, delta, player);
+      if (!this.enemies[i].defeated && this.enemies[i].sprite.active) {
+        this.enemies[i].update(time, delta, player);
+      }
     }
   }
 

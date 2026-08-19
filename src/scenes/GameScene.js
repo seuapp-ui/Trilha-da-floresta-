@@ -106,12 +106,16 @@ export class GameScene extends Phaser.Scene {
       this.player.takeDamage(this.time.now, player.sprite.x);
     });
 
-    // water -> instant respawn (fall hazard)
+    // water -> one respawn per entry. The overlap callback can fire on
+    // consecutive physics steps while the player is inside the zone.
     if (map.waterZone) {
+      this._waterRespawning = false;
       this.physics.add.overlap(player.sprite, map.waterZone, () => {
+        if (this._waterRespawning || player.isDead || this.levelComplete) return;
+        this._waterRespawning = true;
         this.particles.splash(player.sprite.x, player.sprite.y);
-        this.player.takeDamage(this.time.now, player.sprite.x);
-        if (!player.isDead) this._respawnAtCheckpoint();
+        this._respawnAtCheckpoint();
+        this.time.delayedCall(250, () => { this._waterRespawning = false; });
       });
     }
 
@@ -171,9 +175,8 @@ export class GameScene extends Phaser.Scene {
       const now = this.time.now;
       const isStomp = playerSprite.body.velocity.y > 0 && playerSprite.body.bottom <= enemySprite.body.top + 14;
 
-      if (this.player.isAttackActive(now)) {
-        enemy.defeat(false);
-        this.particles.attackSwirl(enemySprite.x, enemySprite.y);
+      if (this.player.isAttackActive(now) && this.player.attackHitEnemies.has(enemy)) {
+        return;
       } else if (isStomp) {
         enemy.defeat(true);
         this.player.bounceFromStomp();
@@ -182,6 +185,32 @@ export class GameScene extends Phaser.Scene {
         this.player.takeDamage(now, enemySprite.x);
       }
     });
+  }
+
+  _processAttackHitbox(time) {
+    if (!this.player.isAttackActive(time)) return;
+
+    const circle = this.player.getAttackHitbox();
+    for (const enemy of this.enemyManager.enemies) {
+      if (!enemy || enemy.defeated || !enemy.sprite.active || !enemy.sprite.body?.enable) continue;
+      if (this.player.attackHitEnemies.has(enemy)) continue;
+
+      const body = enemy.sprite.getBounds();
+      if (Phaser.Geom.Intersects.CircleToRectangle(circle, body)) {
+        this.player.attackHitEnemies.add(enemy);
+        enemy.defeat(false);
+        this.particles.attackSwirl(enemy.sprite.x, enemy.sprite.y);
+      }
+    }
+
+    // Crates use the same forward-facing attack volume, so the visual
+    // attack range and the actual gameplay range now agree.
+    for (const crate of this.collectibles.crates.getChildren()) {
+      if (!crate.active || !crate.body?.enable) continue;
+      if (Phaser.Geom.Intersects.CircleToRectangle(circle, crate.getBounds())) {
+        this._collectLoot(this.collectibles.breakCrate(crate));
+      }
+    }
   }
 
   _collectLoot(loot) {
@@ -210,15 +239,21 @@ export class GameScene extends Phaser.Scene {
       esc: Phaser.Input.Keyboard.KeyCodes.ESC,
     });
 
-    kb.on('keydown-SPACE', () => this.player.handleJumpPressed(this.time.now));
-    kb.on('keydown-UP', () => this.player.handleJumpPressed(this.time.now));
-    kb.on('keydown-W', () => this.player.handleJumpPressed(this.time.now));
-    kb.on('keyup-SPACE', () => this.player.handleJumpReleased());
-    kb.on('keyup-UP', () => this.player.handleJumpReleased());
-    kb.on('keyup-W', () => this.player.handleJumpReleased());
-    kb.on('keydown-X', () => this.player.tryAttack(this.time.now));
-    kb.on('keydown-J', () => this.player.tryAttack(this.time.now));
-    kb.on('keydown-ESC', () => this._togglePause());
+    this._keyboardHandlers = {
+      jumpDown: () => this.player?.handleJumpPressed(this.time.now),
+      jumpUp: () => this.player?.handleJumpReleased(),
+      attack: () => this.player?.tryAttack(this.time.now),
+      pause: () => this._togglePause(),
+    };
+    kb.on('keydown-SPACE', this._keyboardHandlers.jumpDown);
+    kb.on('keydown-UP', this._keyboardHandlers.jumpDown);
+    kb.on('keydown-W', this._keyboardHandlers.jumpDown);
+    kb.on('keyup-SPACE', this._keyboardHandlers.jumpUp);
+    kb.on('keyup-UP', this._keyboardHandlers.jumpUp);
+    kb.on('keyup-W', this._keyboardHandlers.jumpUp);
+    kb.on('keydown-X', this._keyboardHandlers.attack);
+    kb.on('keydown-J', this._keyboardHandlers.attack);
+    kb.on('keydown-ESC', this._keyboardHandlers.pause);
 
     // Virtual/touch input flags, set by UIScene's on-screen controls.
     this.touchInput = { left: false, right: false, run: false, jumpPressed: false, jumpReleased: false, attack: false };
@@ -244,6 +279,20 @@ export class GameScene extends Phaser.Scene {
   }
 
   _cleanupEventBus() {
+    const kb = this.input?.keyboard;
+    const h = this._keyboardHandlers;
+    if (kb && h) {
+      kb.off('keydown-SPACE', h.jumpDown);
+      kb.off('keydown-UP', h.jumpDown);
+      kb.off('keydown-W', h.jumpDown);
+      kb.off('keyup-SPACE', h.jumpUp);
+      kb.off('keyup-UP', h.jumpUp);
+      kb.off('keyup-W', h.jumpUp);
+      kb.off('keydown-X', h.attack);
+      kb.off('keydown-J', h.attack);
+      kb.off('keydown-ESC', h.pause);
+      this._keyboardHandlers = null;
+    }
     EventBus.off('touch-input', this._onTouchInput);
     EventBus.off('touch-jump-down', this._onTouchJumpDown);
     EventBus.off('touch-jump-up', this._onTouchJumpUp);
@@ -276,6 +325,7 @@ export class GameScene extends Phaser.Scene {
     const input = this._readInput();
     this.player.update(time, delta, input, this.map);
     this.enemyManager.update(time, delta, this.player);
+    this._processAttackHitbox(time);
     this.hazards.update(time, delta, this.player.sprite.x);
     this.parallax.update(delta);
 
@@ -301,6 +351,7 @@ export class GameScene extends Phaser.Scene {
     // fade gives the moment weight before control returns to the player.
     this.cameraManager.shake(220, 0.02);
     this.cameraManager.fadeOut(350, () => {
+      if (!this.scene.isActive('Game') || this.levelComplete) return;
       this._respawnAtCheckpoint();
       this.cameraManager.fadeIn(350);
     });

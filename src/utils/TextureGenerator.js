@@ -708,7 +708,16 @@ export class TextureGenerator {
     {
       const g = this.fresh();
       g.fillStyle(0xffe27a, 1);
-      g.fillStar(6, 6, 4, 3, 6);
+      // Phaser 3.70 Graphics has no fillStar(). Draw the spark as a
+      // small 8-point polygon instead so texture generation works on all
+      // supported renderers.
+      const points = [];
+      for (let i = 0; i < 10; i++) {
+        const angle = -Math.PI / 2 + i * Math.PI / 5;
+        const radius = i % 2 === 0 ? 6 : 2.4;
+        points.push({ x: 6 + Math.cos(angle) * radius, y: 6 + Math.sin(angle) * radius });
+      }
+      g.fillPoints(points, true);
       this.save('particle_spark', 12, 12);
     }
   }
